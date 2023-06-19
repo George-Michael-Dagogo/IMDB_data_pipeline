@@ -5,7 +5,7 @@ import pandas as pd
 import datetime
 
 today = datetime.date.today()
-url = [f'https://www.imdb.com/search/title/?title_type=feature&year=2023-01-01,{today}&start={i:d}&ref_=adv_nxt'  for i in (range(1,500, 50))]
+url = [f'https://www.imdb.com/search/title/?title_type=feature&year=2023-01-01,{today}&start={i:d}&ref_=adv_nxt'  for i in (range(1,200, 50))]
 
 titles = []
 years = []
@@ -93,5 +93,6 @@ movie_df = pd.DataFrame({'movie': titles,
                         'imdb': imdb_ratings,
                         'metascore': metascores,
                         'votes': votes})
+movie_df['year'] = movie_df['year'].str[-5:-1] 
 
 print(movie_df)
