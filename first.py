@@ -58,9 +58,9 @@ def scraper_per_page(url):
         else:
             runtimes.append(None)
 
-        if float(box.strong.text) is not None:
+        if box.find('div', class_ = 'inline-block ratings-imdb-rating') is not None:
             #IMDB ratings
-            imdb = float(box.strong.text) # non-standardized variable
+            imdb = float(box.find('div', class_ = 'inline-block ratings-imdb-rating').text) # non-standardized variable
             imdb_ratings.append(imdb)
         else:
             imdb_ratings.append(None)
@@ -72,9 +72,9 @@ def scraper_per_page(url):
         else:
             metascores.append(None)
 
-        if box.find('span', attrs = {'name':'nv'})['data-value'] is not None:
+        if box.find('p', class_ = 'sort-num_votes-visible') is not None:
                 #Number of votes
-            vote = int(box.find('span', attrs = {'name':'nv'})['data-value'])
+            vote = int(box.find('p', class_ = 'sort-num_votes-visible').text.replace('\n','').replace('Votes:','').replace(',',''))
             votes.append(vote)
         else:
             votes.append(None)
