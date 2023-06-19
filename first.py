@@ -85,5 +85,13 @@ def scraper_per_page(url):
 for i in url:
     scraper_per_page(i)
 
-movie_df = pd.DataFrame({'movie': titles, 'year': years,'rating': ratings,'genre': genres,'runtime_min': runtimes,'imdb': imdb_ratings,'metascore': metascores, 'votes': votes}                  )
+movie_df = pd.DataFrame({'movie': titles, 
+                        'year': years,
+                        'rating': ratings,
+                        'genre': genres,
+                        'runtime_min': runtimes,
+                        'imdb': imdb_ratings,
+                        'metascore': metascores,
+                        'votes': votes})
+
 print(movie_df)
