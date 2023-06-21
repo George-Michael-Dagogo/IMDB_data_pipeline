@@ -96,3 +96,11 @@ movie_df = pd.DataFrame({'movie': titles,
 movie_df['year'] = movie_df['year'].str[-5:-1] 
 
 print(movie_df)
+
+conn_string = 'postgresql://testtech:@testtech.postgres.database.azure.com:5432/postgres'
+
+db = create_engine(conn_string)
+conn = db.connect()
+
+movie_df.to_sql('imdb_movies', con=conn, if_exists='append',index=False)
+conn.close()
