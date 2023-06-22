@@ -1,26 +1,28 @@
-#url = "https://www.imdb.com/search/title/?title_type=feature&year=2023-01-01,2023-06-18"
 from bs4 import BeautifulSoup
 import requests
 import pandas as pd
 import datetime
+import psycopg2
 import uuid
 from sqlalchemy import create_engine,text
+from prefect import Flow,task
+from prefect.schedules import IntervalSchedule
 
+@task(max_retries=3, retry_delay=datetime.timedelta(seconds=5))
+def extract_transform_load():
+    today = datetime.date.today()
+    yesterday = datetime.date.today() - datetime.timedelta(days=1)
+    url = 'https://www.imdb.com/search/title/?title_type=feature&year='+ str(yesterday) +','+ str(today) +'&start=1&ref_=adv_nxt'
 
-today = datetime.date.today()
-url = [f'https://www.imdb.com/search/title/?title_type=feature&year=2023-01-01,{today}&start={i:d}&ref_=adv_nxt'  for i in (range(1,4000, 50))]
+    titles = []
+    years = []
+    ratings = []
+    genres = []
+    runtimes = []
+    imdb_ratings = []
+    metascores = []
+    votes = []
 
-titles = []
-years = []
-ratings = []
-genres = []
-runtimes = []
-imdb_ratings = []
-metascores = []
-votes = []
-
-def scraper_per_page(url):
-    print('began')
     page = requests.get(url)
     soup = BeautifulSoup(page.text,  "html.parser")
     movie_box = soup.find_all('div', class_ = 'lister-item mode-advanced')
@@ -85,33 +87,70 @@ def scraper_per_page(url):
             votes.append('No votes')
     print('ended')
 
+            
+
+    movie_df = pd.DataFrame({'movie': titles, 
+                            'year': years,
+                            'rating': ratings,
+                            'genre': genres,
+                            'runtime_min': runtimes,
+                            'imdb_rating': imdb_ratings,
+                            'metascore': metascores,
+                            'votes': votes})
+    movie_df['year'] = movie_df['year'].str[-5:-1] 
+    movie_df['id'] = movie_df.apply(lambda _: uuid.uuid4(), axis=1)
+
+
+    
+    try:
+        conn_string = 'postgresql://testtech:your_password@testtech.postgres.database.azure.com:5432/postgres'
+
+        db = create_engine(conn_string)
+        conn = db.connect()
+        print('connected')
+
+        movie_df.to_sql('movies', con=conn, if_exists='append',index=False)
+        print('push done')
+        conn = psycopg2.connect(database='postgres',
+                                    user='testtech', 
+                                    password='your_password',
+                                    host='testtech.postgres.database.azure.com'
+            )
+
+
+
+        conn.autocommit = True
+        cursor = conn.cursor()
+        # Basic database intergrity and summary
+        sql2 = '''DELETE FROM movies T1 USING movies T2 
+            WHERE T1.ctid < T2.ctid 
+            AND  T1.movie = T2.movie;'''
+            #The “CTID” field is a field that exists in every PostgresSQL table, 
+            #it is always unique for each and every record in the table
+        cursor.execute(sql2)
+
+        sql3 = '''SELECT COUNT(*) FROM movies;'''
+        cursor.execute(sql3)
+        for q in cursor.fetchall():
+            print(q)
         
 
-for i in url:
-    scraper_per_page(i)
 
-movie_df = pd.DataFrame({'movie': titles, 
-                        'year': years,
-                        'rating': ratings,
-                        'genre': genres,
-                        'runtime_min': runtimes,
-                        'imdb_rating': imdb_ratings,
-                        'metascore': metascores,
-                        'votes': votes})
-movie_df['year'] = movie_df['year'].str[-5:-1]
-movie_df['id'] = movie_df.apply(lambda _: uuid.uuid4(), axis=1) 
-
-print(movie_df)
-
-try:
-    conn_string = 'postgresql://testtech:your_password@testtech.postgres.database.azure.com:5432/postgres'
-
-    db = create_engine(conn_string)
-    conn = db.connect()
+    finally:
     
-    movie_df.to_sql('movies', con=conn, if_exists='append',index=False)
-    print('push done')
+        conn.commit()
+        conn.close()
+
+def flow_caso(schedule=None):
+    with Flow("imdb",schedule=schedule) as flow:
+        Extract_Transform_Load = extract_transform_load()
+    return flow
 
 
-finally:
-    print('okay')
+schedule = IntervalSchedule(
+    start_date = datetime.datetime.now() + datetime.timedelta(seconds = 2),
+    interval = datetime.timedelta(hours=24)
+)
+flow=flow_caso(schedule)
+
+flow.run()

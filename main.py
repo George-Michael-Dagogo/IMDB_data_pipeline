@@ -3,7 +3,8 @@ import requests
 import pandas as pd
 import datetime
 import psycopg2
-from sqlalchemy import create_engine
+import uuid
+from sqlalchemy import create_engine,text
 
 today = datetime.date.today()
 yesterday = datetime.date.today() - datetime.timedelta(days=1)
@@ -19,7 +20,6 @@ metascores = []
 votes = []
 
 page = requests.get(url)
-
 soup = BeautifulSoup(page.text,  "html.parser")
 movie_box = soup.find_all('div', class_ = 'lister-item mode-advanced')
 for box in movie_box:
@@ -28,7 +28,7 @@ for box in movie_box:
         title = box.find('h3', class_ = 'lister-item-header').a.text
         titles.append(title)
     else:
-        titles.append('None')
+        titles.append('No title')
 
 
     if box.h3.find('span', class_= 'lister-item-year text-muted unbold') is not None: 
@@ -36,7 +36,7 @@ for box in movie_box:
         year = box.h3.find('span', class_= 'lister-item-year text-muted unbold').text # remove the parentheses around the year and make it an integer
         years.append(year)
     else:
-        years.append(None)
+        years.append('No year')
 
     if box.p.find('span', class_ = 'certificate') is not None:
         #rating
@@ -57,28 +57,30 @@ for box in movie_box:
         time = int(box.p.find('span', class_ = 'runtime').text.replace(" min", "")) # remove the minute word from the runtime and make it an integer
         runtimes.append(time)
     else:
-        runtimes.append(None)
+        runtimes.append('No runtime')
 
     if box.find('div', class_ = 'inline-block ratings-imdb-rating') is not None:
         #IMDB ratings
         imdb = float(box.find('div', class_ = 'inline-block ratings-imdb-rating').text) # non-standardized variable
         imdb_ratings.append(imdb)
     else:
-        imdb_ratings.append(None)
+        imdb_ratings.append('No rating')
 
     if box.find('span', class_ = 'metascore') is not None:
             #Metascore
         m_score = int(box.find('span', class_ = 'metascore').text) # make it an integer
         metascores.append(m_score)
     else:
-        metascores.append(None)
+        metascores.append('No score')
 
     if box.find('p', class_ = 'sort-num_votes-visible') is not None:
             #Number of votes
-        vote = int(box.find('p', class_ = 'sort-num_votes-visible').text.replace('\n','').replace('Votes:','').replace(',',''))
+        vote = str(box.find('p', class_ = 'sort-num_votes-visible').text)
+        numeric_filter = filter(str.isdigit, vote)
+        vote = "".join(numeric_filter)
         votes.append(vote)
     else:
-        votes.append(None)
+        votes.append('No votes')
 print('ended')
 
         
@@ -88,42 +90,51 @@ movie_df = pd.DataFrame({'movie': titles,
                         'rating': ratings,
                         'genre': genres,
                         'runtime_min': runtimes,
-                        'imdb': imdb_ratings,
+                        'imdb_rating': imdb_ratings,
                         'metascore': metascores,
                         'votes': votes})
 movie_df['year'] = movie_df['year'].str[-5:-1] 
+movie_df['id'] = movie_df.apply(lambda _: uuid.uuid4(), axis=1)
 
 print(movie_df)
 
 
-conn_string = 'postgresql://testtech:2@testtech.postgres.database.azure.com:5432/postgres'
+try:
+    conn_string = 'postgresql://testtech:your_password@testtech.postgres.database.azure.com:5432/postgres'
 
-db = create_engine(conn_string)
-conn = db.connect()
+    db = create_engine(conn_string)
+    conn = db.connect()
+    print('connected')
 
-#movie_df.to_sql('imdb_movies', con=conn, if_exists='append',index=False)
-conn.close()
-
-conn = psycopg2.connect(database='postgres',
+    movie_df.to_sql('movies', con=conn, if_exists='append',index=False)
+    print('push done')
+    conn = psycopg2.connect(database='postgres',
                                 user='testtech', 
-                                password='',
+                                password='your_password',
                                 host='testtech.postgres.database.azure.com'
         )
 
 
 
-conn.autocommit = True
-cursor = conn.cursor()
-sql2 = '''DELETE FROM imdb_movies T1 USING imdb_movies T2 
-    WHERE T1.ctid < T2.ctid 
-    AND  T1.movie = T2.movie;'''
-    #The “CTID” field is a field that exists in every PostgresSQL table, 
-    #it is always unique for each and every record in the table
-cursor.execute(sql2)
+    conn.autocommit = True
+    cursor = conn.cursor()
+    # Basic database intergrity and summary
+    sql2 = '''DELETE FROM movies T1 USING movies T2 
+        WHERE T1.ctid < T2.ctid 
+        AND  T1.movie = T2.movie;'''
+        #The “CTID” field is a field that exists in every PostgresSQL table, 
+        #it is always unique for each and every record in the table
+    cursor.execute(sql2)
 
-sql3 = '''SELECT COUNT(*) FROM imdb_movies;'''
-cursor.execute(sql3)
-for q in cursor.fetchall():
-    print(q)
-conn.commit()
-conn.close()
+    sql3 = '''SELECT COUNT(*) FROM movies;'''
+    cursor.execute(sql3)
+    for q in cursor.fetchall():
+        print(q)
+    
+
+
+finally:
+   
+    conn.commit()
+    conn.close()
+
