@@ -14,6 +14,7 @@ def extract_transform_load():
     yesterday = datetime.date.today() - datetime.timedelta(days=1)
     url = 'https://www.imdb.com/search/title/?title_type=feature&year='+ str(yesterday) +','+ str(today) +'&start=1&ref_=adv_nxt'
 
+#EXTRACT AND TRANSFORM
     titles = []
     years = []
     ratings = []
@@ -100,7 +101,7 @@ def extract_transform_load():
     movie_df['year'] = movie_df['year'].str[-5:-1] 
     movie_df['id'] = movie_df.apply(lambda _: uuid.uuid4(), axis=1)
 
-
+#LOAD TO DATABASE
     
     try:
         conn_string = 'postgresql://testtech:your_password@testtech.postgres.database.azure.com:5432/postgres'
