@@ -86,12 +86,10 @@ def scraper_per_page(url):
             votes.append('No votes')
     print('ended')
 
-        
 
-with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
-    executor.map(scraper_per_page, url)
 
-movie_df = pd.DataFrame({'movie': titles, 
+def to_database():
+    movie_df = pd.DataFrame({'movie': titles, 
                         'year': years,
                         'rating': ratings,
                         'genre': genres,
@@ -99,12 +97,9 @@ movie_df = pd.DataFrame({'movie': titles,
                         'imdb_rating': imdb_ratings,
                         'metascore': metascores,
                         'votes': votes})
-movie_df['year'] = movie_df['year'].str[-5:-1]
-movie_df['id'] = movie_df.apply(lambda _: uuid.uuid4(), axis=1) 
+    movie_df['year'] = movie_df['year'].str[-5:-1]
+    movie_df.to_csv('movie.csv', index=False)
 
-movie_df.to_csv('movie.csv', index=False)
-
-def tryt():
     try:
         conn_string = 'postgresql://testtech:your_password@testtech.postgres.database.azure.com:5432/postgres'
 
@@ -115,3 +110,8 @@ def tryt():
 
     finally:
         print('okay')
+
+
+with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
+    executor.map(scraper_per_page, url)
+to_database()
